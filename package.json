@@ -2,7 +2,7 @@
   "dependencies": {
     "express": "^4.21.2",
     "nodemon": "^3.1.9",
-    "sqlite3": "^5.1.7"
+    "pg": "^8.11.3"
   },
   "name": "24rp13777_farmshop",
   "version": "1.0.0",

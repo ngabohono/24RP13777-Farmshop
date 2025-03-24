@@ -1,90 +1,70 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
 
-// Create a new database instance
-const db = new sqlite3.Database(path.join(__dirname, 'farmshop.db'), (err) => {
-    if (err) {
-        console.error('Error connecting to database:', err);
-    } else {
-        console.log('Connected to SQLite database');
-        initializeDatabase();
-    }
+// Create a new database pool
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+});
+
+pool.on('connect', () => {
+    console.log('Connected to PostgreSQL database');
+    initializeDatabase();
+});
+
+pool.on('error', (err) => {
+    console.error('Unexpected error on idle client', err);
+    process.exit(-1);
 });
 
 // Initialize database tables
-function initializeDatabase() {
-    db.run(`
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            price REAL NOT NULL,
-            category TEXT NOT NULL,
-            stock INTEGER NOT NULL
-        )
-    `, (err) => {
-        if (err) {
-            console.error('Error creating products table:', err);
-        } else {
-            console.log('Products table initialized');
-        }
-    });
+async function initializeDatabase() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                price REAL NOT NULL,
+                category TEXT NOT NULL,
+                stock INTEGER NOT NULL
+            )
+        `);
+        console.log('Products table initialized');
+    } catch (err) {
+        console.error('Error creating products table:', err);
+    }
 }
 
 // Database operations
 const dbOperations = {
-    getAllProducts: () => {
-        return new Promise((resolve, reject) => {
-            db.all('SELECT * FROM products', [], (err, rows) => {
-                if (err) reject(err);
-                resolve(rows);
-            });
-        });
+    getAllProducts: async () => {
+        const result = await pool.query('SELECT * FROM products');
+        return result.rows;
     },
 
-    getProductById: (id) => {
-        return new Promise((resolve, reject) => {
-            db.get('SELECT * FROM products WHERE id = ?', [id], (err, row) => {
-                if (err) reject(err);
-                resolve(row);
-            });
-        });
+    getProductById: async (id) => {
+        const result = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+        return result.rows[0];
     },
 
-    createProduct: (product) => {
-        return new Promise((resolve, reject) => {
-            const { name, price, category, stock } = product;
-            db.run(
-                'INSERT INTO products (name, price, category, stock) VALUES (?, ?, ?, ?)',
-                [name, price, category, stock],
-                function(err) {
-                    if (err) reject(err);
-                    resolve({ id: this.lastID, ...product });
-                }
-            );
-        });
+    createProduct: async (product) => {
+        const { name, price, category, stock } = product;
+        const result = await pool.query(
+            'INSERT INTO products (name, price, category, stock) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, price, category, stock]
+        );
+        return result.rows[0];
     },
 
-    updateProduct: (id, product) => {
-        return new Promise((resolve, reject) => {
-            const { name, price, category, stock } = product;
-            db.run(
-                'UPDATE products SET name = ?, price = ?, category = ?, stock = ? WHERE id = ?',
-                [name, price, category, stock, id],
-                (err) => {
-                    if (err) reject(err);
-                    resolve({ id, ...product });
-                }
-            );
-        });
+    updateProduct: async (id, product) => {
+        const { name, price, category, stock } = product;
+        const result = await pool.query(
+            'UPDATE products SET name = $1, price = $2, category = $3, stock = $4 WHERE id = $5 RETURNING *',
+            [name, price, category, stock, id]
+        );
+        return result.rows[0];
     },
 
-    deleteProduct: (id) => {
-        return new Promise((resolve, reject) => {
-            db.run('DELETE FROM products WHERE id = ?', [id], (err) => {
-                if (err) reject(err);
-                resolve();
-            });
-        });
+    deleteProduct: async (id) => {
+        await pool.query('DELETE FROM products WHERE id = $1', [id]);
     }
 };
 
