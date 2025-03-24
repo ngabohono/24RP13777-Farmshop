@@ -4,11 +4,15 @@
     "nodemon": "^3.1.9",
     "pg": "^8.11.3"
   },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^6.3.4"
+  },
   "name": "24rp13777_farmshop",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --detectOpenHandles",
     "start": "nodemon index.js"
   },
   "keywords": [],
